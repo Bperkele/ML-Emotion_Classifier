@@ -3,6 +3,7 @@ import pandas as pd
 
 dataset = load_dataset("dair-ai/emotion",trust_remote_code=True)
 
+
 # Define the labels
 labels = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise']
 
@@ -26,3 +27,6 @@ test_dataset = test_dataset.drop(columns=['label'])
 print(train_dataset.head())
 print(validation_dataset.head())
 print(test_dataset.head())
+
+
+
