@@ -8,13 +8,50 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from collections import Counter
 
 labels = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise']
-path = "D:\Documents\ML-project\ML-Emotion_Classifier\emotion_corrected2.csv"
+path = "D:\Documents\ML-project\ML-Emotion_Classifier\emotion.csv"
 
 # Convert the dataset to a pandas dataframe ignore first column
-df = pd.read_csv(path)
+df = pd.read_csv(path, usecols=[1,2])
 
+# Assuming df['column_name'] is your column of sentences
+df['length'] = df['text'].apply(lambda x: len(x.split()))
+
+def trim_and_downsample_sentences(df, text_col, target_col, min_length=0, max_length=20):
+    # 1. Filter through the text lengths
+    df['length'] = df[text_col].apply(lambda x: len(x.split()))
+    
+    # 2. Find the ones that are over 50 words and trim them to 50 exactly
+    df.loc[df['length'] > max_length, text_col] = df.loc[df['length'] > max_length, text_col].apply(lambda x: ' '.join(x.split()[:max_length]))
+    
+    # 3. If the sentence is under 50, check if it's between the range
+    df = df[(df['length'] >= min_length) & (df['length'] <= max_length)]
+    
+    # 4. Downsample the data
+    min_size = df[target_col].value_counts().min()
+    lst = []
+    for class_index, group in df.groupby(target_col):
+        lst.append(resample(group, replace=False, n_samples=min_size, random_state=123))
+    df_downsampled = pd.concat(lst)
+    
+    return df_downsampled
+
+df = trim_and_downsample_sentences(df, 'text', 'label')
+
+# Plot a histogram
+#plt.hist(df['length'], bins=50)
+#plt.show()
+
+#Remove the length column
+df = df.drop(columns=['length'])
+
+#plot the distribution of the labels
+#plt.hist(df['label'], bins=50)
+#plt.show()
+
+print(df.describe())
 # Split the dataset into training and testing
 train = df.sample(frac=0.8, random_state=200)
 test = df.drop(train.index)
@@ -58,7 +95,7 @@ def read_glove_vecs(glove_file):
     return words_to_index, index_to_words, word_to_vec_map
 
 #read the glove file
-word_to_index, index_to_word, word_to_vec_map = read_glove_vecs("D:\Documents\glove.twitter.27B\glove.twitter.27B.50d.txt")
+word_to_index, index_to_word, word_to_vec_map = read_glove_vecs("D:\Documents\glove.twitter.27B\glove.twitter.27B.25d.txt")
 
 def pad_vector(vec, length):
     # If the vector is shorter than the desired length, pad it with zeros
@@ -68,7 +105,7 @@ def pad_vector(vec, length):
 
 # Apply the function to your word_to_vec_map
 for word, vec in word_to_vec_map.items():
-    word_to_vec_map[word] = pad_vector(vec, 50)
+    word_to_vec_map[word] = pad_vector(vec, 25)
 
 def sentences_to_indices(X, word_to_index, max_len):
     m = X.shape[0]  # number of training examples
@@ -155,7 +192,7 @@ def pretrained_embedding_layer(word_to_vec_map, word_to_index, non_trainable=Tru
     return embed, num_embeddings, embedding_dim
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+print(device)
 def train(model, trainloader, criterion, optimizer, epochs=10):
     
     model.to(device)
@@ -248,15 +285,15 @@ embedding, vocab_size, embedding_dim = pretrained_embedding_layer(word_to_vec_ma
 
 hidden_dim=128
 output_size=6
-batch_size = 32
+batch_size = 16
 
 #print ('Embedding layer is ', embedding)
 #print ('Embedding layer weights ', embedding.weight.shape)
 
 model = NN(embedding, embedding_dim, hidden_dim, vocab_size, output_size, batch_size)
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.02)
-epochs = 50
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+epochs = 100
 train_dataset = torch.utils.data.TensorDataset(torch.tensor(X_train_indices).type(torch.LongTensor), torch.tensor(Y_train).type(torch.LongTensor))
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size)
 
@@ -308,11 +345,24 @@ def predict(input_text, print_sentence=True):
 
   return label
 
-print("------------------------------------")
-predict("I hate you")
-predict("I want a pizza")
-predict("Lets see the game")
-predict("I love you Lisa")
-predict("This is the best day of my life")
+
+#model.load_state_dict(torch.load("model.pth"))
+#model.eval()
+
+print('-----------------TWEETS----------------')
+predict("Just stumbled upon the most amazing little café tucked away in a corner of the city! Who knew such hidden gems existed? #surprised #exploring")
+
+predict("Woke up to the sun streaming through my window, birds chirping, and a fresh cup of coffee. It's the little things that bring so much joy! #blessed #grateful")
+
+predict("Sometimes, no matter how hard you try, things just don't work out the way you hoped. Feeling a bit lost and disappointed today. #sad #keepgoing")
+
+predict("Watching the sunset with the one I love by my side, feeling like the luckiest person in the world. #love #soulmate")
+
+predict("Just experienced the worst customer service ever. It's infuriating when companies don't value their customers! #angry #frustrated")
+
+predict("Heart pounding, palms sweaty, stepping out of my comfort zone to chase my dreams. Terrified of failing, but even more terrified of never trying. #fear #brave")
 print("\n------------------------------------")
+# Save the model
+torch.save(model.state_dict(), "model.pth")
+
 
