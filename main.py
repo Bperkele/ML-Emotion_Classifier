@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from collections import Counter
+from sklearn.metrics import recall_score
 
 labels = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise']
 path = "D:\Documents\ML-project\ML-Emotion_Classifier\emotion.csv"
@@ -300,10 +301,17 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size)
 test_dataset = torch.utils.data.TensorDataset(torch.tensor(X_test_indices).type(torch.LongTensor), torch.tensor(Y_test).type(torch.LongTensor))
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size)
 
-train(model, train_loader, criterion, optimizer, epochs)
+#train(model, train_loader, criterion, optimizer, epochs)
+#load the model
+model.load_state_dict(torch.load("model.pth"))
+
 
 test_loss = 0
 accuracy = 0
+# Initialize a list to store the true and predicted labels
+true_labels = []
+pred_labels = []
+
 model.eval()
 with torch.no_grad():
     for sentences, labels in test_loader:
@@ -315,9 +323,12 @@ with torch.no_grad():
         top_p, top_class = ps.topk(1, dim=1)
         equals = top_class == labels.view(*top_class.shape)
         accuracy += torch.mean(equals.type(torch.FloatTensor))
-model.train()
+
+
+#model.train()
 print("Test Loss: {:.3f}.. ".format(test_loss/len(test_loader)),
       "Test Accuracy: {:.3f}".format(accuracy/len(test_loader)))
+
 running_loss = 0
 
 def predict(input_text, print_sentence=True):
@@ -352,17 +363,17 @@ def predict(input_text, print_sentence=True):
 print('-----------------TWEETS----------------')
 predict("Just stumbled upon the most amazing little café tucked away in a corner of the city! Who knew such hidden gems existed? #surprised #exploring")
 
-predict("Woke up to the sun streaming through my window, birds chirping, and a fresh cup of coffee. It's the little things that bring so much joy! #blessed #grateful")
+predict("Woke up to the sun streaming through my window, birds chirping, and a fresh cup of coffee. #blessed #grateful")
 
-predict("Sometimes, no matter how hard you try, things just don't work out the way you hoped. Feeling a bit lost and disappointed today. #sad #keepgoing")
+predict("Sometimes, no matter how hard you try, things just don't work out the way you hoped. Feeling a bit lost and disappointed. #sad #keepgoing")
 
 predict("Watching the sunset with the one I love by my side, feeling like the luckiest person in the world. #love #soulmate")
 
 predict("Just experienced the worst customer service ever. It's infuriating when companies don't value their customers! #angry #frustrated")
 
-predict("Heart pounding, palms sweaty, stepping out of my comfort zone to chase my dreams. Terrified of failing, but even more terrified of never trying. #fear #brave")
+predict("Heart pounding, palms sweaty, stepping out of my comfort zone. Terrified of failing, but even more terrified of never trying. #fear #brave")
 print("\n------------------------------------")
 # Save the model
-torch.save(model.state_dict(), "model.pth")
+#torch.save(model.state_dict(), "model.pth")
 
 
