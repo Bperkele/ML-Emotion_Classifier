@@ -9,12 +9,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from collections import Counter
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
+import os
+import seaborn as sns
 
 labels = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise']
 path = "D:\Documents\ML-project\ML-Emotion_Classifier\emotion.csv"
 
+
+#print(df.head())
 # Convert the dataset to a pandas dataframe ignore first column
-df = pd.read_csv(path, usecols=[1,2])
+df = pd.read_csv(path)
 
 # Assuming df['column_name'] is your column of sentences
 df['length'] = df['text'].apply(lambda x: len(x.split()))
@@ -198,7 +203,9 @@ def train(model, trainloader, criterion, optimizer, epochs=10):
     model.to(device)
     running_loss = 0
     
-    train_losses, test_losses, accuracies = [], [], []
+    train_losses, test_losses, accuracies, f1_scores, precisions, recalls  = [], [], [], [], [], []
+    epoch_precisions, epoch_recalls, epoch_f1_scores = [], [], []
+    y_true, y_pred = [], []
     for e in range(epochs):
 
         running_loss = 0
@@ -246,16 +253,34 @@ def train(model, trainloader, criterion, optimizer, epochs=10):
                   top_p, top_class = ps.topk(1, dim=1)
                   equals = top_class == labels.view(*top_class.shape)
                   accuracy += torch.mean(equals.type(torch.FloatTensor))
+
+                  # Calculate precision, recall, and F1 score
+                  precision = precision_score(labels.cpu().numpy(), top_class.cpu().numpy(), average='macro', zero_division=1)
+                  recall = recall_score(labels.cpu().numpy(), top_class.cpu().numpy(), average='macro', zero_division=1)
+                  f1 = f1_score(labels.cpu().numpy(), top_class.cpu().numpy(), average='macro', zero_division=1)
+
+                  epoch_precisions.append(precision)
+                  epoch_recalls.append(recall)
+                  epoch_f1_scores.append(f1)
+
+                  y_true.extend(labels.cpu().numpy())
+                  y_pred.extend(top_class.cpu().numpy())
                   
           train_losses.append(running_loss/len(train_loader))
           test_losses.append(test_loss/len(test_loader))
           accuracies.append(accuracy / len(test_loader) * 100)
 
+          # calculate average precision, recall, and F1 score for the epoch
+          precisions.append(np.mean(epoch_precisions))
+          recalls.append(np.mean(epoch_recalls))
+          f1_scores.append(np.mean(epoch_f1_scores))
+          cm = confusion_matrix(y_true, y_pred)
+
           print("Epoch: {}/{}.. ".format(e+1, epochs),
                 "Training Loss: {:.3f}.. ".format(running_loss/len(train_loader)),
                 "Test Loss: {:.3f}.. ".format(test_loss/len(test_loader)),
                 "Test Accuracy: {:.3f}".format(accuracy/len(test_loader)))
-        
+          
     # Plot
     plt.figure(figsize=(20, 5))
     plt.plot(train_losses, c='b', label='Training loss')
@@ -263,12 +288,30 @@ def train(model, trainloader, criterion, optimizer, epochs=10):
     plt.xticks(np.arange(0, epochs))
     plt.title('Losses')
     plt.legend(loc='upper right')
-    plt.show()
+    plt.savefig('losses.png')  # Save figure
+
     plt.figure(figsize=(20, 5))
     plt.plot(accuracies)
     plt.xticks(np.arange(0, epochs))
     plt.title('Accuracy')
-    plt.show()
+    plt.savefig('accuracy.png')  # Save figure
+
+    plt.figure(figsize=(20, 5))
+    plt.plot(precisions, c='g', label='Precision')
+    plt.plot(recalls, c='y', label='Recall')
+    plt.plot(f1_scores, c='b', label='F1 Score')
+    plt.xticks(np.arange(0, epochs))
+    plt.title('Precision, Recall, and F1 Score')
+    plt.legend(loc='upper right')
+    plt.savefig('precision_recall_f1.png')  # Save figure
+
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.xlabel('Predicted')
+    plt.ylabel('Truth')
+    plt.title('Confusion Matrix')
+    plt.savefig('confusion_matrix.png')  # Save figure
+
          
 
 import torch.utils.data
@@ -293,7 +336,7 @@ batch_size = 16
 model = NN(embedding, embedding_dim, hidden_dim, vocab_size, output_size, batch_size)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-epochs = 100
+epochs = 10
 train_dataset = torch.utils.data.TensorDataset(torch.tensor(X_train_indices).type(torch.LongTensor), torch.tensor(Y_train).type(torch.LongTensor))
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size)
 
@@ -350,19 +393,21 @@ def predict(input_text, print_sentence=True):
 #model.eval()
 
 print('-----------------TWEETS----------------')
-predict("Just stumbled upon the most amazing little café tucked away in a corner of the city! Who knew such hidden gems existed? #surprised #exploring")
+predict("Just stumbled upon the most amazing little café tucked away in a corner of the city! Who knew such hidden gems existed?")
 
-predict("Woke up to the sun streaming through my window, birds chirping, and a fresh cup of coffee. It's the little things that bring so much joy! #blessed #grateful")
+predict("Woke up to the sun streaming through my window and a fresh cup of coffee. It's the little things that bring so much joy!")
 
-predict("Sometimes, no matter how hard you try, things just don't work out the way you hoped. Feeling a bit lost and disappointed today. #sad #keepgoing")
+predict("Sometimes, no matter how hard you try, things just don't work out the way you hoped. Feeling a bit lost and disappointed today.")
 
 predict("Watching the sunset with the one I love by my side, feeling like the luckiest person in the world. #love #soulmate")
 
-predict("Just experienced the worst customer service ever. It's infuriating when companies don't value their customers! #angry #frustrated")
+predict("Just experienced the worst customer service ever. It's infuriating when companies don't value their customers!")
 
-predict("Heart pounding, palms sweaty, stepping out of my comfort zone to chase my dreams. Terrified of failing, but even more terrified of never trying. #fear #brave")
+predict("Heart pounding, palms sweaty, stepping out of my comfort zone. Terrified of failing, but even more terrified of never trying. ")
 print("\n------------------------------------")
-# Save the model
-torch.save(model.state_dict(), "model.pth")
+# Save the model as a new model if there is already a model with that path
+
+torch.save(model.state_dict(), "model.pth") if not os.path.isfile("model.pth") else torch.save(model.state_dict(), "new_model.pth")
+
 
 
