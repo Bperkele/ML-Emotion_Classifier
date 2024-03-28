@@ -17,6 +17,15 @@ labels = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise']
 path = "D:\Documents\ML-project\ML-Emotion_Classifier\emotion.csv"
 
 
+#if its in pickle format use this
+#df = pd.read_pickle("merged_training.pkl")
+#convert the emotion to label
+#df['label'] = df['emotion'].apply(lambda x: labels.index(x))
+#df = df.drop(columns=['emotion'])
+#turn labels into integers
+#df['label'] = df['label'].astype(int)
+#df.to_csv("emotion.csv", index=False)
+
 #print(df.head())
 # Convert the dataset to a pandas dataframe ignore first column
 df = pd.read_csv(path)
@@ -395,15 +404,15 @@ def predict(input_text, print_sentence=True):
 print('-----------------TWEETS----------------')
 predict("Just stumbled upon the most amazing little café tucked away in a corner of the city! Who knew such hidden gems existed?")
 
-predict("Woke up to the sun streaming through my window and a fresh cup of coffee. It's the little things that bring so much joy!")
+predict("Woke up to the sun streaming through my window.It's the little things that bring so much joy!")
 
-predict("Sometimes, no matter how hard you try, things just don't work out the way you hoped. Feeling a bit lost and disappointed today.")
+predict("Sometimes, no matter how hard you try, things just don't work out the way you hoped. Feeling disappointed..")
 
 predict("Watching the sunset with the one I love by my side, feeling like the luckiest person in the world. #love #soulmate")
 
 predict("Just experienced the worst customer service ever. It's infuriating when companies don't value their customers!")
 
-predict("Heart pounding, palms sweaty, stepping out of my comfort zone. Terrified of failing, but even more terrified of never trying. ")
+predict("Heart pounding, palms sweaty, stepping out of my comfort zone.Terrified of failing,even more terrified of never trying.")
 print("\n------------------------------------")
 # Save the model as a new model if there is already a model with that path
 
